@@ -29,6 +29,9 @@ class ServerListViewSet(viewsets.ViewSet):
         # Get the category name and quantity from the query parameters.
         category = request.query_params.get("category")
         qty = request.query_params.get("qty")
+        by_user = (
+            request.query_params.get("by_user") == "true"
+        )  # Convert the "by_user" query parameter to a boolean; comparison with "true" checks if the parameter is explicitly set to "true"
 
         # If the user provided a category name, filter the queryset to only include servers in that category.
 
@@ -36,6 +39,13 @@ class ServerListViewSet(viewsets.ViewSet):
         # __name means that we are filtering by the name of the category table as we have relation with category and server table.
         if category:
             self.queryset = self.queryset.filter(category__name=category)
+
+        # Filter the queryset to only include servers by the current user if the 'by_user' query parameter is set to 'true'.
+        if by_user:
+            user_id = request.user.id
+            self.queryset = self.queryset.filter(
+                members=user_id
+            )  # only query servers what have the current user as a member
 
         # The user provided a quantity, so we need to limit the queryset to the specified number of items.
         # We use list slicing to achieve this.
