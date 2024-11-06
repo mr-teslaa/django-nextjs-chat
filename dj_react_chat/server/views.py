@@ -27,15 +27,20 @@ class ServerListViewSet(viewsets.ViewSet):
         It will return a list of all servers in the database, filtered by category if the user provided a category name as a query parameter.
         """
 
-        # Get the category name and quantity from the query parameters.
+        ################################
+        # Get the query parameters
+        ################################
         category = request.query_params.get("category")
         qty = request.query_params.get("qty")
         by_user = (
             request.query_params.get("by_user") == "true"
         )  # Convert the "by_user" query parameter to a boolean; comparison with "true" checks if the parameter is explicitly set to "true"
         by_server_id = request.query_params.get("by_server_id")
+        with_num_members = request.query_params.get("with_num_members") == "true"
 
-        # check if user is authenticated
+        #####################################
+        #  check if user is authenticated
+        #####################################
         if by_user or by_server_id and not request.user.is_authenticated:
             raise AuthenticationFailed()
 
