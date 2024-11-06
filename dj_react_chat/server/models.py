@@ -34,7 +34,7 @@ class Server(models.Model):
     )
 
     def __str__(self):
-        return self.name
+        return f"Name: {self.name} | Id: {self.id}"
 
 
 class Channel(models.Model):

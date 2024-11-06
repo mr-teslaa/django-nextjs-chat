@@ -2,6 +2,7 @@
 
 from rest_framework import viewsets
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from .models import Server
 from .serializer import ServerSerializer
 
@@ -32,6 +33,11 @@ class ServerListViewSet(viewsets.ViewSet):
         by_user = (
             request.query_params.get("by_user") == "true"
         )  # Convert the "by_user" query parameter to a boolean; comparison with "true" checks if the parameter is explicitly set to "true"
+        by_server_id = request.query_params.get("by_server_id")
+
+        # check if user is authenticated
+        if by_user or by_server_id and not request.user.is_authenticated:
+            raise AuthenticationFailed()
 
         # If the user provided a category name, filter the queryset to only include servers in that category.
 
@@ -56,6 +62,16 @@ class ServerListViewSet(viewsets.ViewSet):
         # The queryset will now only contain the first 'qty' items of the original queryset.
         if qty:
             self.queryset = self.queryset[: int(qty)]
+
+        if by_server_id:
+            try:
+                self.queryset = self.queryset.filter(id=by_server_id)
+                if not self.queryset.exists():
+                    raise ValidationError(
+                        detail=f"Server with id {by_server_id} not found"
+                    )
+            except ValueError:
+                raise ValidationError("Server value error")
 
         # Serialize the queryset into a JSON response.
         serializer = ServerSerializer(self.queryset, many=True)
