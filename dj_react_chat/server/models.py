@@ -7,6 +7,10 @@ from django.conf import settings
 class Category(models.Model):
     """
     Represents a category that servers can belong to.
+
+    Attributes:
+        name (str): The name of the category.
+        description (str): An optional description of the category.
     """
 
     name = models.CharField(max_length=100)
@@ -19,6 +23,19 @@ class Category(models.Model):
 class Server(models.Model):
     """
     Represents a server which can have multiple members and belong to a category.
+
+    Attributes:
+        name (str): The name of the server.
+        owner (User): The owner of the server.
+        category (Category): The category the server belongs to.
+        description (str): An optional description of the server.
+        members (User[]): The members of the server.
+
+    Query Parameters:
+        - category (str): The name of the category to filter by.
+        - by_user (bool): Whether to filter by the current user.
+        - by_server_id (str): The ID of the server to filter by.
+        - with_num_members (bool): Whether to include the number of members in the response.
     """
 
     name = models.CharField(max_length=100)
@@ -40,6 +57,12 @@ class Server(models.Model):
 class Channel(models.Model):
     """
     Represents a communication channel within a server.
+
+    Attributes:
+        name (str): The name of the channel.
+        owner (User): The owner of the channel.
+        topic (str): The topic of the channel.
+        server (Server): The server the channel belongs to.
     """
 
     name = models.CharField(max_length=100)

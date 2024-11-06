@@ -3,18 +3,12 @@
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
+from django.db.models import Count
 from .models import Server
 from .serializer import ServerSerializer
 
 
 class ServerListViewSet(viewsets.ViewSet):
-    """
-    ViewSet for listing all servers.
-
-    This ViewSet will be used to list all servers in the database.
-    You can filter the servers by category by passing the category name as a query parameter.
-    """
-
     # This is the queryset that will be used to retrieve the servers.
     # It is a queryset of all servers in the database.
     queryset = Server.objects.all()
@@ -23,8 +17,22 @@ class ServerListViewSet(viewsets.ViewSet):
         """
         List all servers.
 
-        This function will be called when the user makes a GET request to the view.
-        It will return a list of all servers in the database, filtered by category if the user provided a category name as a query parameter.
+        This function is triggered upon a GET request to the view, returning a list of
+        all servers in the database, filtered based on provided query parameters.
+
+        Query Parameters:
+            - category (str): Optional; filter servers by category name.
+            - qty (int): Optional; limit the number of results returned.
+            - by_user (bool): Optional; if true, filter servers by the current user.
+            - by_server_id (str): Optional; filter by specific server ID.
+            - with_num_members (bool): Optional; include number of members in the response.
+
+        Args:
+            request (Request): The request that triggered this view.
+
+        Returns:
+            Response: A JSON response containing a list of all servers, potentially filtered
+            by the specified query parameters.
         """
 
         ################################
@@ -58,6 +66,9 @@ class ServerListViewSet(viewsets.ViewSet):
                 members=user_id
             )  # only query servers what have the current user as a member
 
+        if with_num_members:
+            self.queryset = self.queryset.annotate(num_members=Count("members"))
+
         # The user provided a quantity, so we need to limit the queryset to the specified number of items.
         # We use list slicing to achieve this.
         # The syntax is: queryset[start:stop]
@@ -79,7 +90,9 @@ class ServerListViewSet(viewsets.ViewSet):
                 raise ValidationError("Server value error")
 
         # Serialize the queryset into a JSON response.
-        serializer = ServerSerializer(self.queryset, many=True)
+        serializer = ServerSerializer(
+            self.queryset, many=True, context={"num_members": with_num_members}
+        )
 
         # Return the serialized queryset as the response.
         return Response(serializer.data)
