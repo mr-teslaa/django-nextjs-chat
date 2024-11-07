@@ -5,36 +5,65 @@ from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from django.db.models import Count
 from .models import Server
+from .schema import server_list_docs
 from .serializer import ServerSerializer
 
 
 class ServerListViewSet(viewsets.ViewSet):
+    """
+    **ServerListViewSet**
+
+    A Django REST Framework ViewSet for retrieving and filtering servers based on multiple criteria.
+
+    ### Attributes:
+    - **queryset (QuerySet)**: The default queryset used to retrieve all servers from the database.
+
+    ### Methods:
+    - `list(request)`: Retrieves and filters a list of servers based on the provided query parameters.
+    """
+
     # This is the queryset that will be used to retrieve the servers.
     # It is a queryset of all servers in the database.
     queryset = Server.objects.all()
 
-    def list(self, request):
+    @server_list_docs
+    def get_queryset(self, request):
         """
-        List all servers.
+        **Lists and filters servers based on query parameters.**
 
-        This function is triggered upon a GET request to the view, returning a list of
-        all servers in the database, filtered based on provided query parameters.
+        This method applies optional filters to the server list, based on parameters
+        like category, user membership, specific server ID, and whether to include
+        the number of members for each server.
 
-        Query Parameters:
-            - category (str): Optional; filter servers by category name.
-            - qty (int): Optional; limit the number of results returned.
-            - by_user (bool): Optional; if true, filter servers by the current user.
-            - by_server_id (str): Optional; filter by specific server ID.
-            - with_num_members (bool): Optional; include number of members in the response.
+        ### Args:
+        - **request (Request)**: The HTTP request object containing query parameters.
 
-        Args:
-            request (Request): The request that triggered this view.
+        ### Query Parameters:
+        - `category` **(str, optional)**: Filter servers by the specified category name.
+        - `qty` **(str, optional)**: Limit the number of servers returned to this quantity.
+        - `by_user` **(str, optional)**: If set to `"true"`, filters servers where the current user is a member.
+        - `by_server_id` **(str, optional)**: Retrieve a specific server by its ID.
+        - `with_num_members` **(str, optional)**: If set to `"true"`, includes the number of members in each server.
 
-        Returns:
-            Response: A JSON response containing a list of all servers, potentially filtered
-            by the specified query parameters.
+        ### Raises:
+        - **AuthenticationFailed**: Raised if the user is not authenticated when using `by_user` or `by_server_id`.
+        - **ValidationError**: Raised for invalid `by_server_id` values or if no server is found for the provided ID.
+
+        ### Returns:
+        - **Response**: A `Response` object containing the serialized data of the filtered server list.
+
+        ### Example Usage:
+        ```python
+        GET /servers/?category=gaming&qty=10
+        Returns the first 10 servers in the "gaming" category
+
+        GET /servers/?by_user=true
+        Returns servers where the current user is a member
+
+        GET /servers/?by_server_id=123
+        Returns the server with the ID 123
+        ```
         """
-
         ################################
         # Get the query parameters
         ################################
@@ -46,14 +75,6 @@ class ServerListViewSet(viewsets.ViewSet):
         by_server_id = request.query_params.get("by_server_id")
         with_num_members = request.query_params.get("with_num_members") == "true"
 
-        #####################################
-        #  check if user is authenticated
-        #####################################
-        if by_user or by_server_id and not request.user.is_authenticated:
-            raise AuthenticationFailed()
-
-        # If the user provided a category name, filter the queryset to only include servers in that category.
-
         # Filter the queryset to only include servers in the specified category.
         # __name means that we are filtering by the name of the category table as we have relation with category and server table.
         if category:
@@ -61,6 +82,8 @@ class ServerListViewSet(viewsets.ViewSet):
 
         # Filter the queryset to only include servers by the current user if the 'by_user' query parameter is set to 'true'.
         if by_user:
+            if not request.user.is_authenticated:
+                raise AuthenticationFailed()
             user_id = request.user.id
             self.queryset = self.queryset.filter(
                 members=user_id
@@ -80,6 +103,9 @@ class ServerListViewSet(viewsets.ViewSet):
             self.queryset = self.queryset[: int(qty)]
 
         if by_server_id:
+            if not request.user.is_authenticated:
+                raise AuthenticationFailed()
+
             try:
                 self.queryset = self.queryset.filter(id=by_server_id)
                 if not self.queryset.exists():

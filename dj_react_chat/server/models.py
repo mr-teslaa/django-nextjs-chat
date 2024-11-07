@@ -2,6 +2,21 @@
 
 from django.db import models
 from django.conf import settings
+from django.dispatch import receiver
+from django.shortcuts import get_object_or_404
+from .validators import validate_icon_image_size, validate_image_file_extension
+
+
+def category_icon_path(instance, filename):
+    return f"category/{instance.name}/category_icon/{filename}"
+
+
+def server_icon_path(instance, filename):
+    return f"server/{instance.name}/server_icon/{filename}"
+
+
+def server_banner_path(instance, filename):
+    return f"server/{instance.name}/server_banner/{filename}"
 
 
 class Category(models.Model):
@@ -10,12 +25,44 @@ class Category(models.Model):
 
     Attributes:
         name (str): The name of the category.
+        icon (str): The path to the icon for this category.
         description (str): An optional description of the category.
     """
 
     name = models.CharField(max_length=100)
+    icon = models.FileField(upload_to=category_icon_path, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
 
+    ###########################
+    # Category image changes
+    ###########################
+    def save(self, *args, **kwargs):
+        if self.id:
+            # query the Category instance from the database
+            existing = get_object_or_404(Category, id=self.id)
+
+            # if the icon has changed
+            if existing.icon != self.icon:
+                # delete the old icon file, save=False because to avoid conflict
+                existing.icon.delete(save=False)
+
+        # finally saving the changes
+        super().save(*args, **kwargs)
+
+    ###########################
+    # Category detetion
+    ###########################
+    # django singals to call when a Category is deleted
+    @receiver(models.signals.pre_delete, sender="server.Category")
+    def category_delete_files(sender, instance, **kwargs):
+        for field in instance._meta.fields:
+            # Get the icon and delete it
+            if field.name == "icon":
+                file = getattr(instance, field.name)
+                if file:
+                    file.delete(save=False)
+
+    # Category initialization
     def __str__(self):
         return self.name
 
@@ -73,11 +120,60 @@ class Channel(models.Model):
     server = models.ForeignKey(
         Server, on_delete=models.CASCADE, related_name="channel_server"
     )
+    banner = models.ImageField(
+        upload_to=server_banner_path,
+        blank=True,
+        null=True,
+        validators=[validate_image_file_extension],
+    )
+    icon = models.ImageField(
+        upload_to=server_icon_path,
+        blank=True,
+        null=True,
+        validators=[validate_icon_image_size, validate_image_file_extension],
+    )
 
+    ###########################
+    # Category image changes
+    ###########################
     def save(self, *args, **kwargs):
-        # Ensure the channel name is stored in lowercase
-        self.name = self.name.lower()
-        super(Channel, self).save(*args, **kwargs)
+        # self.name = self.name.lower()
+        # super(Channel, self).save(*args, **kwargs)
+
+        if self.id:
+            # query the Category instance from the database
+            existing = get_object_or_404(Category, id=self.id)
+
+            # if the icon has changed
+            if existing.icon != self.icon:
+                # delete the old icon file, save=False because to avoid conflict
+                existing.icon.delete(save=False)
+
+            # if the banner has changed
+            if existing.banner != self.banner:
+                # delete the old banner file, save=False because to avoid conflict
+                existing.banner.delete(save=False)
+
+        # finally saving the changes
+        super().save(*args, **kwargs)
+
+    ###########################
+    # Category detetion
+    ###########################
+    # django singals to call when a Category is deleted
+    @receiver(models.signals.pre_delete, sender="server.Server")
+    def category_delete_files(sender, instance, **kwargs):
+        for field in instance._meta.fields:
+            # Get the icon and delete it
+            if field.name == "icon" or field.name == "banner":
+                file = getattr(instance, field.name)
+                if file:
+                    file.delete(save=False)
+
+    # def save(self, *args, **kwargs):
+    #     # Ensure the channel name is stored in lowercase
+    #     self.name = self.name.lower()
+    #     super(Channel, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.name
